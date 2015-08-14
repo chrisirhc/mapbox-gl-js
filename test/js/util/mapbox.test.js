@@ -65,6 +65,21 @@ test("mapbox", function(t) {
         t.end();
     });
 
+    t.test('.normalizeSpriteURL', function(t) {
+        t.test('correctly transforms mapbox:// URLs', function(t) {
+            t.equal(
+                mapbox.normalizeSpriteURL('mapbox://mapbox.streets-v8', undefined, '.json'),
+                'https://a.tiles.mapbox.com/styles/v1/mapbox/mapbox.streets-v8/sprite.json@1x?access_token=key'
+            );
+            t.end();
+        });
+
+        t.test('correctly transforms non-mapbox:// scheme', function(t) {
+            t.equal(mapbox.normalizeSpriteURL('http://path', '@2x', '.png'), 'http://path@2x.png');
+            t.end();
+        });
+    });
+
     t.test('.normalizeStyleURL', function(t) {
         t.test('returns an API URL with access_token parameter', function(t) {
             t.equal(mapbox.normalizeStyleURL('mapbox://user.style'), 'https://a.tiles.mapbox.com/styles/v1/user/user.style?access_token=key');
