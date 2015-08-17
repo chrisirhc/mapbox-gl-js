@@ -311,6 +311,11 @@ Painter.prototype.render = function(style, options) {
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
+    this.renderFromTexture();
+};
+
+Painter.prototype.renderFromTexture = function () {
+    var gl = this.gl;
     // Disable stencil test to draw over everything
     gl.disable(gl.STENCIL_TEST);
 
