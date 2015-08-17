@@ -34,11 +34,35 @@ Painter.prototype.resize = function(width, height) {
     this.height = height * browser.devicePixelRatio;
     gl.viewport(0, 0, this.width, this.height);
 
+    // Set size of texture
+    var texture = this.texture;
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+        gl.TEXTURE_2D, 0, gl.RGBA, this.width, this.height, 0,
+      gl.RGBA, gl.UNSIGNED_BYTE, null);
 };
 
 
 Painter.prototype.setup = function() {
     var gl = this.gl;
+
+    var texture = this.texture = gl.createTexture();
+    var framebuffer = this.framebuffer = gl.createFramebuffer();
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+
+    // Set up texture so we can render any size image and so we are
+    // working with pixels.
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+    gl.framebufferTexture2D(
+      gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
     gl.verbose = true;
 
@@ -106,6 +130,12 @@ Painter.prototype.setup = function() {
         ['u_matrix', 'u_scale', 'u_zoom', 'u_maxzoom']
     );
 
+    this.textureShader = gl.initializeShader('texture',
+        ['a_pos', 'a_texCoord'],
+        ['u_matrix', 'u_image']
+    );
+
+
     this.identityMatrix = mat4.create();
 
     // The backgroundBuffer is used when drawing to the full *canvas*
@@ -113,9 +143,21 @@ Painter.prototype.setup = function() {
     this.backgroundBuffer.itemSize = 2;
     this.backgroundBuffer.itemCount = 4;
     gl.bindBuffer(gl.ARRAY_BUFFER, this.backgroundBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Int16Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Int16Array([-1, -1,
+        1, -1,
+        -1, 1,
+        1, 1]), gl.STATIC_DRAW);
 
     this.setExtent(4096);
+
+    // provide texture coordinates for the rectangle.
+    this.texCoordBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        0.0,  0.0,
+        1.0,  0.0,
+        0.0,  1.0,
+        1.0,  1.0]), gl.STATIC_DRAW);
 
     // The debugTextBuffer is used to draw tile IDs for debugging
     this.debugTextBuffer = gl.createBuffer();
@@ -251,6 +293,8 @@ Painter.prototype.render = function(style, options) {
     this.frameHistory.record(this.transform.zoom);
 
     this.prepareBuffers();
+    var gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.framebuffer);
     this.clearColor();
 
     for (var i = style._groups.length - 1; i >= 0; i--) {
@@ -265,6 +309,24 @@ Painter.prototype.render = function(style, options) {
             this.drawLayers(group, this.identityMatrix);
         }
     }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+
+    // Disable stencil test to draw over everything
+    gl.disable(gl.STENCIL_TEST);
+
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
+    var shader = this.textureShader;
+
+    gl.switchShader(shader, this.identityMatrix);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
+    gl.vertexAttribPointer(shader.a_texCoord, 2, gl.FLOAT, false, 0, 0);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.backgroundBuffer);
+    gl.vertexAttribPointer(shader.a_pos, this.backgroundBuffer.itemSize, gl.SHORT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.backgroundBuffer.itemCount);
+
+    gl.enable(gl.STENCIL_TEST);
 };
 
 Painter.prototype.drawTile = function(tile, layers) {

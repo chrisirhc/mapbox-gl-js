@@ -15,5 +15,6 @@ module.exports = {
     "raster": glify('../../shaders/raster.*.glsl'),
     "icon": glify('../../shaders/icon.*.glsl'),
     "sdf": glify('../../shaders/sdf.*.glsl'),
+    "texture": glify('../../shaders/texture.*.glsl'),
     "collisionbox": glify('../../shaders/collisionbox.*.glsl')
 };
