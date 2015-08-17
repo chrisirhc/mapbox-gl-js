@@ -150,6 +150,11 @@ Painter.prototype.setup = function() {
 
     this.setExtent(4096);
 
+    // provide screen coordinates for the texture.
+    this.texRenderCoordBuffer = gl.createBuffer();
+    this.texRenderCoordBuffer.itemSize = 2;
+    this.texRenderCoordBuffer.itemCount = 4;
+
     // provide texture coordinates for the rectangle.
     this.texCoordBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
@@ -311,10 +316,33 @@ Painter.prototype.render = function(style, options) {
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
 
-    this.renderFromTexture();
+    this.renderFromTexture([
+        -1, 0,
+        0, 0,
+        -1, 1,
+        0, 1
+    ]);
+    this.renderFromTexture([
+        0, 0,
+        1, 0,
+        0, 1,
+        1, 1
+    ]);
+    this.renderFromTexture([
+        -1, -1,
+        0, -1,
+        -1, 0,
+        0, 0
+    ]);
+    this.renderFromTexture([
+        0, -1,
+        1, -1,
+        0, 0,
+        1, 0
+    ]);
 };
 
-Painter.prototype.renderFromTexture = function () {
+Painter.prototype.renderFromTexture = function (coords) {
     var gl = this.gl;
     // Disable stencil test to draw over everything
     gl.disable(gl.STENCIL_TEST);
@@ -327,9 +355,15 @@ Painter.prototype.renderFromTexture = function () {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.texCoordBuffer);
     gl.vertexAttribPointer(shader.a_texCoord, 2, gl.FLOAT, false, 0, 0);
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, this.backgroundBuffer);
-    gl.vertexAttribPointer(shader.a_pos, this.backgroundBuffer.itemSize, gl.SHORT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.backgroundBuffer.itemCount);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.texRenderCoordBuffer);
+
+    gl.bufferData(
+        gl.ARRAY_BUFFER,
+        new Int16Array(coords),
+        gl.STATIC_DRAW);
+
+    gl.vertexAttribPointer(shader.a_pos, this.texRenderCoordBuffer.itemSize, gl.SHORT, false, 0, 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.texRenderCoordBuffer.itemCount);
 
     gl.enable(gl.STENCIL_TEST);
 };
